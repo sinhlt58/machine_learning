@@ -34,10 +34,13 @@ def svm_loss_naive(W, X, y, reg):
       margin = scores[j] - correct_class_score + 1 # note delta = 1
       if margin > 0:
         loss += margin
+        dW[:, y[i]] += -X[i]
+        dW[:, j] += X[i]
 
   # Right now the loss is a sum over all training examples, but we want it
   # to be an average instead so we divide by num_train.
   loss /= num_train
+  dW /= num_train
 
   # Add regularization to the loss.
   loss += reg * np.sum(W * W)
@@ -61,15 +64,30 @@ def svm_loss_vectorized(W, X, y, reg):
 
   Inputs and outputs are the same as svm_loss_naive.
   """
+  num_samples = X.shape[0]
   loss = 0.0
   dW = np.zeros(W.shape) # initialize the gradient as zero
+  dScores = np.zeros((num_samples, W.shape[1]))
 
   #############################################################################
   # TODO:                                                                     #
   # Implement a vectorized version of the structured SVM loss, storing the    #
   # result in loss.                                                           #
   #############################################################################
-  pass
+  scores = X.dot(W)
+  scores = scores - scores[np.arange(scores.shape[0]), y].reshape(scores.shape[0], 1) + 1
+  mask = scores < 0
+  scores[np.arange(scores.shape[0]), y] = 0
+  scores[mask] = 0
+
+  # intermidiate values to compute the gradients
+  mask2 = scores > 0
+  tmp = np.sum(mask2, axis=1)
+  dScores[mask2] = 1
+  dScores[np.arange(dScores.shape[0]), y] = -tmp
+
+  loss = np.sum(scores) / num_samples
+  loss += reg * np.sum(W*W)
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -84,7 +102,8 @@ def svm_loss_vectorized(W, X, y, reg):
   # to reuse some of the intermediate values that you used to compute the     #
   # loss.                                                                     #
   #############################################################################
-  pass
+  dW = np.dot(X.T, dScores)
+  dW /= num_samples
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
