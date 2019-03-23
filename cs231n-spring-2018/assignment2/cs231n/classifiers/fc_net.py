@@ -256,7 +256,7 @@ class FullyConnectedNet(object):
                 cache[1] = cache2
             caches.append(cache)
             
-            reg_sum = np.sum(W * W)
+            reg_sum += np.sum(W ** 2)
 
         scores = z
         ############################################################################
@@ -287,12 +287,16 @@ class FullyConnectedNet(object):
 
         current_dout = dscores
         for i in reversed(range(1, self.num_layers+1)):
-            cache_z, cache_relu = cahces[i-1]
+            cache_z, cache_relu = caches[i-1]
             if i < self.num_layers:
-                pass
+                current_dout = relu_backward(current_dout, cache_relu)
             
             dx, dw, db = affine_backward(current_dout, cache_z)
-            
+            dw += self.reg * self.params['W{}'.format(i)]
+
+            grads['W{}'.format(i)] = dw
+            grads['b{}'.format(i)] = db
+
             current_dout = dx
         ############################################################################
         #                             END OF YOUR CODE                             #
