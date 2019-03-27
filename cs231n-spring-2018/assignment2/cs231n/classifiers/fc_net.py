@@ -185,6 +185,10 @@ class FullyConnectedNet(object):
         for i in range(1, len(layer_dims)):
             self.params['W{}'.format(i)] = weight_scale * np.random.randn(layer_dims[i-1], layer_dims[i])
             self.params['b{}'.format(i)] = np.zeros((layer_dims[i],))
+            if i < self.num_layers:
+                if self.normalization == 'batchnorm':
+                    self.params['gamma{}'.format(i)] = np.ones((layer_dims[i],))
+                    self.params['beta{}'.format(i)] = np.zeros((layer_dims[i],))
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -248,12 +252,21 @@ class FullyConnectedNet(object):
         reg_sum = 0
         for i in range(1, self.num_layers+1):
             W, b = self.params['W{}'.format(i)], self.params['b{}'.format(i)]
-            z, cache1 = affine_forward(current_z, W, b)
-            cache = [cache1, 0]
+            z, cache_z = affine_forward(current_z, W, b)
+            cache = {
+                'cache_z': cache_z
+            }
             if i < self.num_layers:
-                relu, cache2 = relu_forward(z)
+                z_norm = z
+                if self.normalization == 'batchnorm':
+                    x_norm, cache_bn = batchnorm_forward(z, self.params['gamma{}'.format(i)],\
+                                                            self.params['beta{}'.format(i)], self.bn_params[i-1])
+                    cache['cache_bn'] = cache_bn
+                    z_norm = x_norm
+
+                relu, cache_relu = relu_forward(z_norm)
                 current_z = relu
-                cache[1] = cache2
+                cache['cache_relu'] = cache_relu
             caches.append(cache)
             
             reg_sum += np.sum(W ** 2)
@@ -287,16 +300,24 @@ class FullyConnectedNet(object):
 
         current_dout = dscores
         for i in reversed(range(1, self.num_layers+1)):
-            cache_z, cache_relu = caches[i-1]
+            cache = caches[i - 1]
+            cache_z, cache_relu = cache['cache_z'], cache.get('cache_relu', None)
+            cache_bn = cache.get('cache_bn', None)
             if i < self.num_layers:
                 current_dout = relu_backward(current_dout, cache_relu)
-            
+
+                if self.normalization == 'batchnorm':
+                    dbnx, dbngamma, dbnbeta = batchnorm_backward_alt(current_dout, cache_bn)
+                    current_dout = dbnx
+                    grads['gamma{}'.format(i)] = dbngamma
+                    grads['beta{}'.format(i)] = dbnbeta
+
             dx, dw, db = affine_backward(current_dout, cache_z)
             dw += self.reg * self.params['W{}'.format(i)]
 
             grads['W{}'.format(i)] = dw
             grads['b{}'.format(i)] = db
-
+            
             current_dout = dx
         ############################################################################
         #                             END OF YOUR CODE                             #
