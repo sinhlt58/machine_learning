@@ -272,6 +272,12 @@ class FullyConnectedNet(object):
                 relu, cache_relu = relu_forward(z_norm)
                 current_z = relu
                 cache['cache_relu'] = cache_relu
+
+                if self.use_dropout:
+                    dropout, cache_dropout = dropout_forward(current_z, self.dropout_param)
+                    cache['cache_dropout'] = cache_dropout
+                    current_z = dropout
+
             caches.append(cache)
             
             reg_sum += np.sum(W ** 2)
@@ -309,7 +315,11 @@ class FullyConnectedNet(object):
             cache_z, cache_relu = cache['cache_z'], cache.get('cache_relu', None)
             cache_bn = cache.get('cache_bn', None)
             cache_ln = cache.get('cache_ln', None)
+            cache_dropout = cache.get('cache_dropout', None)
             if i < self.num_layers:
+                if self.use_dropout:
+                    current_dout = dropout_backward(current_dout, cache_dropout)
+
                 current_dout = relu_backward(current_dout, cache_relu)
 
                 if self.normalization == 'batchnorm':
