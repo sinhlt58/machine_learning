@@ -186,7 +186,7 @@ class FullyConnectedNet(object):
             self.params['W{}'.format(i)] = weight_scale * np.random.randn(layer_dims[i-1], layer_dims[i])
             self.params['b{}'.format(i)] = np.zeros((layer_dims[i],))
             if i < self.num_layers:
-                if self.normalization == 'batchnorm':
+                if self.normalization:
                     self.params['gamma{}'.format(i)] = np.ones((layer_dims[i],))
                     self.params['beta{}'.format(i)] = np.zeros((layer_dims[i],))
         ############################################################################
@@ -263,6 +263,11 @@ class FullyConnectedNet(object):
                                                             self.params['beta{}'.format(i)], self.bn_params[i-1])
                     cache['cache_bn'] = cache_bn
                     z_norm = x_norm
+                if self.normalization == 'layernorm':
+                    x_norm, cache_ln = layernorm_forward(z, self.params['gamma{}'.format(i)],\
+                                                            self.params['beta{}'.format(i)], self.bn_params[i-1])
+                    cache['cache_ln'] = cache_ln
+                    z_norm = x_norm
 
                 relu, cache_relu = relu_forward(z_norm)
                 current_z = relu
@@ -303,11 +308,18 @@ class FullyConnectedNet(object):
             cache = caches[i - 1]
             cache_z, cache_relu = cache['cache_z'], cache.get('cache_relu', None)
             cache_bn = cache.get('cache_bn', None)
+            cache_ln = cache.get('cache_ln', None)
             if i < self.num_layers:
                 current_dout = relu_backward(current_dout, cache_relu)
 
                 if self.normalization == 'batchnorm':
                     dbnx, dbngamma, dbnbeta = batchnorm_backward_alt(current_dout, cache_bn)
+                    current_dout = dbnx
+                    grads['gamma{}'.format(i)] = dbngamma
+                    grads['beta{}'.format(i)] = dbnbeta
+
+                if self.normalization == 'layernorm':
+                    dbnx, dbngamma, dbnbeta = layernorm_backward(current_dout, cache_ln)
                     current_dout = dbnx
                     grads['gamma{}'.format(i)] = dbngamma
                     grads['beta{}'.format(i)] = dbnbeta

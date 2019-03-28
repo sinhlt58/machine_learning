@@ -332,7 +332,16 @@ def layernorm_forward(x, gamma, beta, ln_param):
     # transformations you could perform, that would enable you to copy over   #
     # the batch norm code and leave it almost unchanged?                      #
     ###########################################################################
-    pass
+    N, D = x.shape
+
+    mean = np.mean(x, axis=1).reshape(N, 1)
+    var = np.var(x, axis=1).reshape(N, 1)
+    std = np.sqrt(var + eps)
+    x_hat = (x - mean) / std
+    y = gamma.reshape(1, D) * x_hat + beta.reshape(1, D)
+    
+    out = y
+    cache = (x, x_hat, y, mean, var, std, gamma, beta)
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -363,7 +372,18 @@ def layernorm_backward(dout, cache):
     # implementation of batch normalization. The hints to the forward pass    #
     # still apply!                                                            #
     ###########################################################################
-    pass
+    x, x_hat, y, mean, var, std, gamma, beta = cache
+    N, D = x_hat.shape
+
+    dgamma = (dout * x_hat).sum(axis=0)
+    dbeta = dout.sum(axis=0)
+
+    dx_hat = dout * gamma
+    
+    dmean = (dx_hat * (-1 / std)).sum(axis=1).reshape(N, 1)
+    dvar = (dx_hat * (-1/2) * (x_hat / std**2)).sum(axis=1).reshape(N, 1)
+
+    dx = dx_hat / std + (1/D) * dmean + (2/D) * (x - mean) * dvar
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
