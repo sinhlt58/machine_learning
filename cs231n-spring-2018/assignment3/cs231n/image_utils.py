@@ -6,6 +6,7 @@ import urllib.request, urllib.error, urllib.parse, os, tempfile
 
 import numpy as np
 from scipy.misc import imread, imresize
+import matplotlib.pyplot as plt
 
 """
 Utility functions used for viewing and processing images.
@@ -54,17 +55,23 @@ def deprocess_image(img, rescale=False):
 
 
 def image_from_url(url):
+    from PIL import Image
+    import requests
+    from io import BytesIO
+
     """
     Read an image from a URL. Returns a numpy array with the pixel data.
     We write the image to a temporary file then read it back. Kinda gross.
     """
     try:
-        f = urllib.request.urlopen(url)
-        _, fname = tempfile.mkstemp()
-        with open(fname, 'wb') as ff:
-            ff.write(f.read())
-        img = imread(fname)
-        os.remove(fname)
+        response = requests.get(url)
+        img = Image.open(BytesIO(response.content))
+        # f = urllib.request.urlopen(url)
+        # _, fname = tempfile.mkstemp()
+        # with open(fname, 'wb') as ff:
+        #     ff.write(f.read())
+        # img = imread(ff)
+        # # os.remove(fname)
         return img
     except urllib.error.URLError as e:
         print('URL Error: ', e.reason, url)

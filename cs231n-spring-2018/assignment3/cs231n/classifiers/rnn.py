@@ -140,7 +140,31 @@ class CaptioningRNN(object):
         # Note also that you are allowed to make use of functions from layers.py   #
         # in your implementation, if needed.                                       #
         ############################################################################
-        pass
+        H0, cache_proj = affine_forward(features, W_proj, b_proj)
+        X_embed, cache_embed = word_embedding_forward(captions_in, W_embed)
+
+        if self.cell_type == 'rnn':
+          hiddens, cache_hiddens = rnn_forward(X_embed, H0, Wx, Wh, b)
+        temporal_scores, cache_temporal_scores = temporal_affine_forward(hiddens, W_vocab, b_vocab)
+
+        loss, dscores = temporal_softmax_loss(temporal_scores, captions_out, mask)
+
+        dhiddens, dW_vocab, db_vocab = temporal_affine_backward(dscores, cache_temporal_scores)
+        if self.cell_type == 'rnn':
+          dX_embed, dH0, dWx, dWh, db = rnn_backward(dhiddens, cache_hiddens)
+        dW_embed = word_embedding_backward(dX_embed, cache_embed)
+        _, dW_proj, db_proj = affine_backward(dH0, cache_proj)
+
+        grads = {
+          'W_vocab': dW_vocab,
+          'b_vocab': db_vocab,
+          'W_embed': dW_embed,
+          'W_proj': dW_proj,
+          'b_proj': db_proj,
+          'Wx': dWx,
+          'Wh': dWh,
+          'b': db
+        }
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -205,7 +229,24 @@ class CaptioningRNN(object):
         # NOTE: we are still working over minibatches in this function. Also if   #
         # you are using an LSTM, initialize the first cell state to zeros.        #
         ###########################################################################
-        pass
+        H0 = features.dot(W_proj) + b_proj
+        captions = np.zeros((features.shape[0], max_length), dtype=int)
+        
+        curr_word_idxs = np.full((features.shape[0],), self._start, dtype=int)
+        curr_H = H0
+
+        for i in range(0, max_length):
+          words_embed = W_embed[curr_word_idxs]
+          H, _ = rnn_step_forward(words_embed, curr_H, Wx, Wh, b)
+
+          scores, _ = affine_forward(H, W_vocab, b_vocab)
+          # print (scores.shape)
+          predicted_word_idxs = scores.argmax(axis=1)
+          # print (predicted_word_idxs)
+          captions[:, i] = predicted_word_idxs
+
+          curr_word_idxs = predicted_word_idxs
+          curr_H = H
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
